@@ -22,7 +22,7 @@ export async function notifyHub(payload: unknown) {
   const body = JSON.stringify(payload);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (process.env.HUB_WEBHOOK_SECRET)
-    headers["X-Findbase-Signature"] = "sha256=" + createHmac("sha256", process.env.HUB_WEBHOOK_SECRET).update(body).digest("hex");
+    headers["X-Finebase-Signature"] = "sha256=" + createHmac("sha256", process.env.HUB_WEBHOOK_SECRET).update(body).digest("hex");
   try {
     const r = await fetch(url, { method: "POST", headers, body, signal: AbortSignal.timeout(4000) });
     return r.ok;

@@ -16,7 +16,7 @@ export default function Products() {
 
   return (
     <>
-      <PageHead title="Products & services" sub="Everything Findbase Labs offers." />
+      <PageHead title="Products & services" sub="Everything Finebase Labs offers." />
       <div className="mb-6 flex gap-px border border-line bg-line sm:w-fit">
         {cats.map((c) => (
           <button key={c} onClick={() => setCat(c)}

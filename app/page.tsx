@@ -20,7 +20,7 @@ export default function Overview() {
 
   return (
     <>
-      <PageHead title={`Welcome back, ${profile.firstName}`} sub="Your Findbase Labs customer portal.">
+      <PageHead title={`Welcome back, ${profile.firstName}`} sub="Your Finebase Labs customer portal.">
         <button className="btn btn-primary" onClick={() => setChatOpen(true)}>Chat with support</button>
       </PageHead>
 

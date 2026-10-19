@@ -16,7 +16,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         <div className="flex items-center gap-3">
           <span className="grid h-8 w-8 place-items-center bg-accent font-mono text-xs font-bold text-black">FN</span>
           <div>
-            <div className="text-sm font-medium">Findbase support</div>
+            <div className="text-sm font-medium">Finebase support</div>
             <div className="flex items-center gap-1.5 text-xs text-muted">
               <span className="h-1.5 w-1.5 bg-accent" /> Connected via Agent Gateway
             </div>

@@ -1,4 +1,4 @@
-# Findbase portal ↔ Hub connector API
+# Finebase portal ↔ Hub connector API
 
 All hub endpoints live under `/api/hub/*` and require:
 
@@ -15,7 +15,7 @@ Responses are JSON; errors are `{ "error": "..." }` (401 bad key, 404 not found,
 2. Hub learns about it in one (or both) of two ways:
    - **Pull:** poll `GET /api/hub/messages?since=<lastSeq>` (cursor = `nextSince` from the previous response).
    - **Push:** set `HUB_WEBHOOK_URL`; the portal POSTs `{ event: "message.created", conversationId, customerId, message }` with header
-     `X-Findbase-Signature: sha256=<HMAC-SHA256(body, HUB_WEBHOOK_SECRET)>`.
+     `X-Finebase-Signature: sha256=<HMAC-SHA256(body, HUB_WEBHOOK_SECRET)>`.
 3. Hub orchestrates its agents, gathers context (endpoints below), then replies with `POST /api/hub/messages`.
 4. The customer's browser polls every 2.5 s and shows the reply, optionally with quick-reply buttons.
 

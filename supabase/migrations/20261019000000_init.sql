@@ -1,4 +1,4 @@
--- Findbase Labs customer portal: schema + seed data.
+-- Finebase Labs customer portal: schema + seed data.
 -- All access goes through Next.js API routes using the service role key, so RLS is enabled with no public policies.
 
 create table if not exists products (
@@ -54,7 +54,7 @@ alter table messages enable row level security;
 
 -- Seed data
 insert into products (id, name, tagline, description, category, price, billing, features) values
- ('p-core','Findbase Core','Unified customer data layer','A single source of truth for every customer interaction, synced across all of your tools in real time.','Platform',49,'monthly',array['Unlimited contacts','Real-time sync','REST & webhook API','99.9% uptime SLA']),
+ ('p-core','Finebase Core','Unified customer data layer','A single source of truth for every customer interaction, synced across all of your tools in real time.','Platform',49,'monthly',array['Unlimited contacts','Real-time sync','REST & webhook API','99.9% uptime SLA']),
  ('p-insight','Insight Analytics','Dashboards without the noise','Cohort, funnel and retention analytics with a query builder that actually respects your time.','Platform',89,'monthly',array['Cohort & funnel reports','Custom metrics','Scheduled exports','Role-based access']),
  ('p-agent','Agent Gateway','Connect external support agents','Bridge outside AI and human agents into the customer chat with scoped, auditable permissions.','Platform',129,'monthly',array['Agent handoff protocol','Scoped tokens','Audit trail','Live transcript stream']),
  ('p-vault','Vault Storage','Encrypted document storage','End-to-end encrypted file storage with versioning and customer-managed keys.','Add-on',19,'monthly',array['500 GB included','Version history','Customer-managed keys','Granular sharing']),

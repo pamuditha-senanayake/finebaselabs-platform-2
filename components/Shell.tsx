@@ -26,7 +26,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       <aside className="border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:w-60 md:shrink-0 md:border-b-0 md:border-r">
         <div className="flex items-center gap-2 px-5 py-4 md:py-6">
           <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-xs font-bold text-black">F</span>
-          <span className="font-semibold tracking-tight">Findbase Labs</span>
+          <span className="font-semibold tracking-tight">Finebase Labs</span>
         </div>
         <nav className="flex overflow-x-auto md:block md:px-3">
           {nav.map((n) => {

@@ -4,8 +4,8 @@ import { StoreProvider } from "@/lib/store";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {
-  title: "Findbase Labs · Customer Portal",
-  description: "Manage your Findbase Labs products, purchases, refunds and support.",
+  title: "Finebase Labs · Customer Portal",
+  description: "Manage your Finebase Labs products, purchases, refunds and support.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
