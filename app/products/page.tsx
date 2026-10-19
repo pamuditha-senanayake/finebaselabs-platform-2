@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { products, fmt } from "@/lib/data";
+import { fmt } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { PageHead } from "@/components/ui";
 
@@ -10,7 +10,7 @@ const per = { monthly: "/mo", yearly: "/yr", "one-time": " one-time" };
 
 export default function Products() {
   const [cat, setCat] = useState<(typeof cats)[number]>("All");
-  const { orders, sendMessage, setChatOpen } = useStore();
+  const { orders, sendMessage, setChatOpen, products } = useStore();
   const owned = new Set(orders.filter((o) => o.status === "paid" || o.status === "refund_pending").map((o) => o.productId));
   const list = products.filter((p) => cat === "All" || p.category === cat);
 

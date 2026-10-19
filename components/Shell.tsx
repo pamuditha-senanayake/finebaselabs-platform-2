@@ -17,7 +17,7 @@ const nav = [
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { chatOpen, setChatOpen, profile, refunds } = useStore();
+  const { chatOpen, setChatOpen, profile, refunds, ready, error, reload } = useStore();
   const pending = refunds.filter((r) => r.status === "pending").length;
   const onSupport = path === "/support";
 
@@ -44,7 +44,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         <div className="mt-auto hidden border-t border-line p-4 md:absolute md:bottom-0 md:block md:w-60">
           <div className="flex items-center gap-3">
             <span className="grid h-8 w-8 place-items-center border border-line bg-raised font-mono text-xs">
-              {profile.firstName[0]}{profile.lastName[0]}
+              {profile.firstName?.[0]}{profile.lastName?.[0]}
             </span>
             <div className="min-w-0 text-xs">
               <div className="truncate text-white">{profile.firstName} {profile.lastName}</div>
@@ -55,7 +55,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 px-5 py-8 md:px-10 md:py-10">
-        <div className="mx-auto max-w-6xl">{children}</div>
+        <div className="mx-auto max-w-6xl">
+          {error ? (
+            <div className="card p-8 text-sm"><div className="label text-red-400">Couldn&apos;t load data</div>
+              <p className="mt-2 text-muted">{error}</p><button className="btn mt-4" onClick={reload}>Retry</button></div>
+          ) : !ready ? <div className="label">Loading…</div> : children}
+        </div>
       </main>
 
       {!onSupport && (

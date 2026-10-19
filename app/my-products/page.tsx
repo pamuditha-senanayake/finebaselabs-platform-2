@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { productById, fmt, fmtDate, daysLeft, refundEligible } from "@/lib/data";
+import { fmt, fmtDate, daysLeft, refundEligible } from "@/lib/data";
 import { PageHead } from "@/components/ui";
 
 export default function MyProducts() {
-  const { orders } = useStore();
+  const { orders, productById } = useStore();
   const owned = orders.filter((o) => o.status === "paid" || o.status === "refund_pending");
 
   return (
@@ -15,6 +15,7 @@ export default function MyProducts() {
       <div className="grid gap-px border border-line bg-line md:grid-cols-2">
         {owned.map((o) => {
           const p = productById(o.productId);
+          if (!p) return null;
           return (
             <div key={o.id} className="bg-surface p-6">
               <div className="flex items-center justify-between">

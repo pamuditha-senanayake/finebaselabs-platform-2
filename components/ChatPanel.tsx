@@ -16,7 +16,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         <div className="flex items-center gap-3">
           <span className="grid h-8 w-8 place-items-center bg-accent font-mono text-xs font-bold text-black">FN</span>
           <div>
-            <div className="text-sm font-medium">Finn · Support agent</div>
+            <div className="text-sm font-medium">Findbase support</div>
             <div className="flex items-center gap-1.5 text-xs text-muted">
               <span className="h-1.5 w-1.5 bg-accent" /> Connected via Agent Gateway
             </div>
@@ -26,14 +26,15 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        {messages.length === 0 && <p className="text-sm text-muted">Send a message to start. A support agent will reply here.</p>}
         {messages.map((m) => (
           <div key={m.id} className={m.from === "customer" ? "flex flex-col items-end" : "flex flex-col items-start"}>
             <div className={`max-w-[85%] whitespace-pre-wrap px-3 py-2 text-sm leading-relaxed ${
-              m.from === "customer" ? "bg-accent text-black" : "border border-line bg-raised"}`}>
+              m.from === "customer" ? `bg-accent text-black ${m.pending ? "opacity-60" : ""}` : m.from === "system" ? "border border-red-500/40 text-red-400" : "border border-line bg-raised"}`}>
               {m.text}
             </div>
             <div className="mt-1 font-mono text-[10px] text-muted">
-              {m.from === "agent" ? "Finn" : "You"} · {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {m.from === "customer" ? "You" : m.name ?? "Support"} · {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </div>
             {m.actions && m.id === lastId && (
               <div className="mt-2 flex max-w-full flex-wrap gap-2">
@@ -47,7 +48,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
             )}
           </div>
         ))}
-        {typing && <div className="font-mono text-xs text-muted">Finn is typing…</div>}
+        {typing && <div className="font-mono text-xs text-muted">Agent is typing…</div>}
         <div ref={end} />
       </div>
 

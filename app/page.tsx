@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { productById, fmt, fmtDate, refundEligible } from "@/lib/data";
+import { fmt, fmtDate, refundEligible } from "@/lib/data";
 import { PageHead, StatusTag } from "@/components/ui";
 
 export default function Overview() {
-  const { orders, profile, refunds, setChatOpen } = useStore();
+  const { orders, profile, refunds, setChatOpen, productById } = useStore();
   const active = new Set(orders.filter((o) => o.status === "paid" || o.status === "refund_pending").map((o) => o.productId));
   const spent = orders.filter((o) => o.status !== "refunded").reduce((s, o) => s + o.amount, 0);
   const eligible = orders.filter(refundEligible).length;
@@ -42,7 +42,7 @@ export default function Overview() {
           {orders.slice(0, 5).map((o) => (
             <div key={o.id} className="flex items-center justify-between gap-3 border-b border-line px-5 py-3 last:border-0">
               <div className="min-w-0">
-                <div className="truncate text-sm">{productById(o.productId).name}</div>
+                <div className="truncate text-sm">{productById(o.productId)?.name ?? o.productId}</div>
                 <div className="font-mono text-xs text-muted">{o.id} · {fmtDate(o.date)}</div>
               </div>
               <div className="flex items-center gap-3">

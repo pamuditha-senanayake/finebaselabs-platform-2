@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { productById, fmt, fmtDate, refundEligible, daysLeft, REFUND_WINDOW_DAYS, type Order } from "@/lib/data";
+import { fmt, fmtDate, refundEligible, daysLeft, REFUND_WINDOW_DAYS, type Order } from "@/lib/data";
 import { PageHead, StatusTag } from "@/components/ui";
 import RefundModal from "@/components/RefundModal";
 
 export default function Orders() {
-  const { orders, startRefundChat } = useStore();
+  const { orders, startRefundChat, productById } = useStore();
   const [target, setTarget] = useState<Order | null>(null);
 
   return (
@@ -26,7 +26,7 @@ export default function Orders() {
             {orders.map((o) => (
               <tr key={o.id} className="border-b border-line last:border-0 hover:bg-raised/50">
                 <td className="px-5 py-4 font-mono text-xs">{o.id}</td>
-                <td className="px-5 py-4">{productById(o.productId).name}</td>
+                <td className="px-5 py-4">{productById(o.productId)?.name ?? o.productId}</td>
                 <td className="px-5 py-4 text-muted">{fmtDate(o.date)}</td>
                 <td className="px-5 py-4 text-muted">{o.method}</td>
                 <td className="px-5 py-4 font-mono">{fmt(o.amount)}</td>

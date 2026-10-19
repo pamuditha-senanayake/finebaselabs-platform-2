@@ -15,13 +15,14 @@ export default function Account() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(profile);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   return (
     <>
       <PageHead title="Account" sub="Your personal and company details.">
         {!editing && <button className="btn" onClick={() => { setForm(profile); setSaved(false); setEditing(true); }}>Edit details</button>}
       </PageHead>
-      <form className="card p-6" onSubmit={(e) => { e.preventDefault(); saveProfile(form); setEditing(false); setSaved(true); }}>
+      <form className="card p-6" onSubmit={async (e) => { e.preventDefault(); const m = await saveProfile(form); setErr(m); if (!m) { setEditing(false); setSaved(true); } }}>
         <div className="grid gap-5 sm:grid-cols-2">
           {fields.map(([k, label]) => (
             <div key={k}>
@@ -38,6 +39,7 @@ export default function Account() {
             <button type="button" className="btn" onClick={() => setEditing(false)}>Cancel</button>
           </div>
         )}
+        {err && <p className="mt-4 text-sm text-red-400">{err}</p>}
         {saved && <p className="mt-6 border-t border-line pt-4 text-sm text-accent">Details updated.</p>}
       </form>
     </>

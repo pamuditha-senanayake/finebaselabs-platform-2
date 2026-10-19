@@ -1,25 +1,25 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  initialOrders, initialProfile, initialRefunds, products, productById, refundEligible, daysLeft, daysSince,
-  refundReasons, REFUND_WINDOW_DAYS, fmt, type Order, type Profile, type RefundRequest,
+  toOrder, toProduct, toProfile, toRefund,
+  type Order, type Product, type Profile, type RefundRequest,
 } from "./data";
 
 export type ChatAction = { label: string; value: string };
 export type ChatMessage = {
-  id: string; from: "customer" | "agent"; text: string; at: number; actions?: ChatAction[];
+  id: string; seq: number; from: "customer" | "agent" | "system"; name?: string; text: string; at: number; actions?: ChatAction[]; pending?: boolean;
 };
 
-type Flow = { step: "order" | "reason" | "confirm"; orderId?: string; reason?: string } | null;
-
 type Store = {
+  ready: boolean; error: string | null; reload: () => void;
+  products: Product[]; productById: (id: string) => Product | undefined;
   orders: Order[]; profile: Profile; refunds: RefundRequest[]; messages: ChatMessage[];
   typing: boolean; chatOpen: boolean; setChatOpen: (v: boolean) => void;
-  saveProfile: (p: Profile) => void;
-  requestRefund: (orderId: string, reason: string, source: RefundRequest["source"]) => void;
+  saveProfile: (p: Profile) => Promise<string | null>;
+  requestRefund: (orderId: string, reason: string) => Promise<string | null>;
   startRefundChat: (orderId?: string) => void;
-  sendMessage: (text: string) => void;
+  sendMessage: (text: string) => Promise<void>;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -29,146 +29,119 @@ export const useStore = () => {
   return c;
 };
 
-let seq = 0;
-const mid = () => `m${Date.now()}-${seq++}`;
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const toMsg = (r: any): ChatMessage => ({
+  id: r.id, seq: r.seq, from: r.sender, name: r.sender_name ?? undefined, text: r.body,
+  at: new Date(r.created_at).getTime(), actions: r.actions ?? undefined,
+});
 
-const welcome: ChatMessage = {
-  id: "welcome", from: "agent", at: Date.now(),
-  text: "Hi Amara, I'm Finn from Findbase support. I can answer questions about our products, your orders, or help with a refund.",
-  actions: [
-    { label: "Request a refund", value: "I'd like a refund" },
-    { label: "Browse products", value: "What products do you offer?" },
-    { label: "Refund policy", value: "What is your refund policy?" },
-  ],
-};
+async function api(path: string, init?: RequestInit) {
+  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json" }, cache: "no-store" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
+  return body;
+}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState(initialOrders);
-  const [profile, setProfile] = useState(initialProfile);
-  const [refunds, setRefunds] = useState(initialRefunds);
-  const [messages, setMessages] = useState<ChatMessage[]>([welcome]);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [profile, setProfile] = useState<Profile>({} as Profile);
+  const [refunds, setRefunds] = useState<RefundRequest[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const flow = useRef<Flow>(null);
-  const ordersRef = useRef(orders);
-  ordersRef.current = orders;
+  const lastSeq = useRef(0);
 
-  const requestRefund = useCallback((orderId: string, reason: string, source: RefundRequest["source"]) => {
-    setOrders((o) => o.map((x) => (x.id === orderId ? { ...x, status: "refund_pending" } : x)));
-    setRefunds((r) => [
-      { id: `RF-${2300 + r.length + 1}`, orderId, reason, source, date: new Date().toISOString(), status: "pending" },
-      ...r,
-    ]);
+  const merge = useCallback((incoming: ChatMessage[]) => {
+    if (!incoming.length) return;
+    lastSeq.current = Math.max(lastSeq.current, ...incoming.map((m) => m.seq));
+    setMessages((cur) => {
+      const ids = new Set(cur.map((m) => m.id));
+      return [...cur.filter((m) => !(m.pending && incoming.some((i) => i.from === "customer" && i.text === m.text))),
+        ...incoming.filter((m) => !ids.has(m.id))];
+    });
   }, []);
 
-  const pushAgent = useCallback((text: string, actions?: ChatAction[], delay = 700) => {
-    setTyping(true);
-    setTimeout(() => {
-      setMessages((m) => [...m, { id: mid(), from: "agent", text, at: Date.now(), actions }]);
-      setTyping(false);
-    }, delay);
+  const load = useCallback(async (silent = false) => {
+    try {
+      const d = await api("/api/portal/bootstrap");
+      setProducts(d.products.map(toProduct));
+      setOrders(d.orders.map(toOrder));
+      setProfile(toProfile(d.customer));
+      setRefunds(d.refunds.map(toRefund));
+      merge(d.messages.map(toMsg));
+      setError(null);
+      setReady(true);
+    } catch (e) {
+      if (!silent) setError((e as Error).message);
+    }
+  }, [merge]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Poll for agent replies (every 2.5s) and refresh orders/refunds (every 10s) so hub decisions show up.
+  useEffect(() => {
+    if (!ready) return;
+    const chat = setInterval(async () => {
+      try {
+        const d = await api(`/api/portal/chat?after=${lastSeq.current}`);
+        merge(d.messages.map(toMsg));
+        setTyping(d.typing);
+      } catch { /* transient; next tick retries */ }
+    }, 2500);
+    const data = setInterval(() => load(true), 10000);
+    return () => { clearInterval(chat); clearInterval(data); };
+  }, [ready, load, merge]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    const temp: ChatMessage = { id: `tmp-${Date.now()}`, seq: 0, from: "customer", text: t, at: Date.now(), pending: true };
+    setMessages((m) => [...m, temp]);
+    try {
+      const d = await api("/api/portal/chat", { method: "POST", body: JSON.stringify({ text: t }) });
+      const real = toMsg(d.message);
+      lastSeq.current = Math.max(lastSeq.current, real.seq);
+      setMessages((m) => m.map((x) => (x.id === temp.id ? real : x)).filter((x, i, a) => a.findIndex((y) => y.id === x.id) === i));
+    } catch {
+      setMessages((m) => m.filter((x) => x.id !== temp.id));
+      setMessages((m) => [...m, { id: `err-${Date.now()}`, seq: 0, from: "system", text: "Message failed to send. Please try again.", at: Date.now() }]);
+    }
   }, []);
 
-  const eligibleActions = useCallback(() =>
-    ordersRef.current.filter(refundEligible).map((o) => ({
-      label: `${o.id} · ${productById(o.productId).name} · ${fmt(o.amount)}`, value: `refund:${o.id}`,
-    })), []);
+  const requestRefund = useCallback(async (orderId: string, reason: string) => {
+    try {
+      await api("/api/portal/refunds", { method: "POST", body: JSON.stringify({ orderId, reason }) });
+      await load(true);
+      return null;
+    } catch (e) { return (e as Error).message; }
+  }, [load]);
 
-  const askOrder = useCallback(() => {
-    const acts = eligibleActions();
-    if (!acts.length) {
-      pushAgent(`None of your orders are inside the ${REFUND_WINDOW_DAYS}-day refund window. Want me to escalate to a human agent for an exception?`,
-        [{ label: "Escalate to human", value: "Escalate to a human agent" }]);
-      flow.current = null;
-      return;
-    }
-    flow.current = { step: "order" };
-    pushAgent(`Sure. These orders are eligible (within ${REFUND_WINDOW_DAYS} days). Which one is it for?`, acts);
-  }, [eligibleActions, pushAgent]);
-
-  const askReason = useCallback((orderId: string) => {
-    const o = ordersRef.current.find((x) => x.id === orderId);
-    if (!o || !refundEligible(o)) {
-      pushAgent("That order isn't eligible for a refund. Pick another one?", eligibleActions());
-      return;
-    }
-    flow.current = { step: "reason", orderId };
-    pushAgent(`Got it: ${productById(o.productId).name} (${fmt(o.amount)}), ${daysLeft(o)} days left in the window. What's the reason?`,
-      refundReasons.map((r) => ({ label: r, value: `reason:${r}` })));
-  }, [eligibleActions, pushAgent]);
+  const saveProfile = useCallback(async (p: Profile) => {
+    try {
+      const d = await api("/api/portal/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ first_name: p.firstName, last_name: p.lastName, email: p.email, phone: p.phone,
+          company: p.company, role: p.role, country: p.country, timezone: p.timezone }),
+      });
+      setProfile(toProfile(d.customer));
+      return null;
+    } catch (e) { return (e as Error).message; }
+  }, []);
 
   const startRefundChat = useCallback((orderId?: string) => {
     setChatOpen(true);
-    setMessages((m) => [...m, { id: mid(), from: "customer", at: Date.now(), text: orderId ? `I'd like a refund for ${orderId}` : "I'd like a refund" }]);
-    if (orderId) askReason(orderId); else askOrder();
-  }, [askOrder, askReason]);
-
-  const sendMessage = useCallback((raw: string) => {
-    const text = raw.trim();
-    if (!text) return;
-    const f = flow.current;
-    let display = text;
-    if (text.startsWith("refund:")) display = `Refund for ${text.slice(7)}`;
-    if (text.startsWith("reason:")) display = text.slice(7);
-    if (text === "confirm:yes") display = "Submit request";
-    if (text === "confirm:no") display = "Cancel";
-    setMessages((m) => [...m, { id: mid(), from: "customer", at: Date.now(), text: display }]);
-    const t = text.toLowerCase();
-
-    if (text.startsWith("refund:")) return askReason(text.slice(7));
-
-    if (text.startsWith("reason:") && f?.orderId) {
-      const reason = text.slice(7);
-      const o = ordersRef.current.find((x) => x.id === f.orderId)!;
-      flow.current = { step: "confirm", orderId: f.orderId, reason };
-      return pushAgent(`To confirm: refund ${fmt(o.amount)} for ${o.id} (${productById(o.productId).name}), reason "${reason}". Submit it?`,
-        [{ label: "Submit request", value: "confirm:yes" }, { label: "Cancel", value: "confirm:no" }]);
-    }
-
-    if (text.startsWith("confirm:")) {
-      if (text === "confirm:yes" && f?.step === "confirm" && f.orderId && f.reason) {
-        requestRefund(f.orderId, f.reason, "Chat");
-        flow.current = null;
-        return pushAgent(`Done. Refund request submitted for ${f.orderId}. Our billing team reviews within 2 business days and you'll get an email. You can track it under Refunds.`,
-          [{ label: "Anything else?", value: "That's all, thanks" }]);
-      }
-      flow.current = null;
-      return pushAgent("No problem, I've cancelled that. Anything else I can help with?");
-    }
-
-    if (/refund|money back|cancel.*(order|purchase)|return/.test(t)) {
-      if (/policy|how long|window|days|eligible/.test(t))
-        return pushAgent(`You can request a refund within ${REFUND_WINDOW_DAYS} days of purchase for any product or service. Requests are reviewed within 2 business days, and approved refunds go back to the original payment method in 5 to 7 days.`,
-          [{ label: "Request a refund", value: "I'd like a refund" }]);
-      const named = ordersRef.current.find((o) => t.includes(o.id.toLowerCase()));
-      return named ? askReason(named.id) : askOrder();
-    }
-    if (/human|person|escalate|manager/.test(t))
-      return pushAgent("Connecting you to a human agent through the Agent Gateway. Someone from the team will join this thread shortly. Your transcript is shared with them.");
-    if (/status|track/.test(t)) {
-      const open = refunds.filter((r) => r.status === "pending");
-      return pushAgent(open.length ? `You have ${open.length} refund request(s) pending: ${open.map((r) => r.id).join(", ")}.` : "You have no pending refund requests.");
-    }
-    if (/order|purchase|bought|history|invoice/.test(t)) {
-      const last = ordersRef.current[0];
-      return pushAgent(`Your latest order is ${last.id} (${productById(last.productId).name}, ${fmt(last.amount)}) placed ${daysSince(last.date)} days ago. Full history is under Purchase history.`,
-        [{ label: "Request a refund", value: "I'd like a refund" }]);
-    }
-    const prod = products.find((p) => t.includes(p.name.toLowerCase()) || t.includes(p.name.split(" ")[0].toLowerCase()));
-    if (prod)
-      return pushAgent(`${prod.name}: ${prod.description} Features: ${prod.features.join(", ")}. ${fmt(prod.price)}/${prod.billing === "one-time" ? "one-time" : prod.billing === "monthly" ? "mo" : "yr"}.`);
-    if (/product|offer|service|sell|price|pricing|plan/.test(t))
-      return pushAgent(`We offer ${products.length} products: ${products.map((p) => p.name).join(", ")}. Ask about any of them by name for details.`);
-    if (/hi|hello|hey/.test(t)) return pushAgent("Hello! What can I help you with today?");
-    if (/thank|that's all|bye/.test(t)) return pushAgent("Happy to help. Have a great day!");
-    pushAgent("I'm not sure about that one. I can help with products, orders and refunds, or connect you with a human agent.",
-      [{ label: "Request a refund", value: "I'd like a refund" }, { label: "Talk to a human", value: "Escalate to a human agent" }]);
-  }, [askOrder, askReason, pushAgent, refunds, requestRefund]);
+    sendMessage(orderId ? `I'd like a refund for order ${orderId}` : "I'd like a refund");
+  }, [sendMessage]);
 
   const value = useMemo<Store>(() => ({
+    ready, error, reload: () => { setError(null); load(); },
+    products, productById: (id) => products.find((p) => p.id === id),
     orders, profile, refunds, messages, typing, chatOpen, setChatOpen,
-    saveProfile: setProfile, requestRefund, startRefundChat, sendMessage,
-  }), [orders, profile, refunds, messages, typing, chatOpen, requestRefund, startRefundChat, sendMessage]);
+    saveProfile, requestRefund, startRefundChat, sendMessage,
+  }), [ready, error, load, products, orders, profile, refunds, messages, typing, chatOpen, saveProfile, requestRefund, startRefundChat, sendMessage]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
